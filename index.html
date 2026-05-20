@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0ea5e9" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
+  <meta name="description" content="Persönlicher Haushaltsplan und Expense-Tracker">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Haushaltsplan">
+  <title>Haushaltsplan</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand">
+        <img src="icon.svg" alt="" width="32" height="32">
+        <span>Haushaltsplan</span>
+      </div>
+      <nav class="top-nav" aria-label="Hauptnavigation">
+        <button class="nav-btn" data-view="dashboard" aria-current="page">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l2-2 4 4 8-8 4 4"/><path d="M3 21h18"/></svg>
+          <span>Dashboard</span>
+        </button>
+        <button class="nav-btn" data-view="entries">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+          <span>Einträge</span>
+        </button>
+        <button class="nav-btn" data-view="categories">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          <span>Kategorien</span>
+        </button>
+        <button class="nav-btn" data-view="settings">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Einstellungen</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <!-- ========== DASHBOARD ========== -->
+    <section class="view" id="view-dashboard" data-active="true">
+      <div class="backup-banner" id="backup-banner" hidden>
+        <svg class="bb-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <div class="backup-banner-text">
+          <strong>Backup empfohlen</strong>
+          <span id="backup-banner-detail">Sichere deine Daten in deine Cloud.</span>
+        </div>
+        <div class="backup-banner-actions">
+          <button class="btn-primary" id="backup-now-btn">Jetzt sichern</button>
+          <button class="btn-text" id="backup-snooze-btn">Später</button>
+        </div>
+      </div>
+      <div class="view-header">
+        <h1>Dashboard</h1>
+        <div class="timeframe-selector">
+          <label for="timeframe">Zeitraum:</label>
+          <select id="timeframe">
+            <option value="current-month">Aktueller Monat</option>
+            <option value="last-month">Letzter Monat</option>
+            <option value="last-3-months">Letzte 3 Monate</option>
+            <option value="last-6-months">Letzte 6 Monate</option>
+            <option value="last-12-months">Letzte 12 Monate</option>
+            <option value="current-year">Aktuelles Jahr</option>
+            <option value="custom">Benutzerdefiniert</option>
+          </select>
+          <div class="custom-range" id="custom-range" hidden>
+            <input type="date" id="range-from" aria-label="Von">
+            <span>–</span>
+            <input type="date" id="range-to" aria-label="Bis">
+          </div>
+        </div>
+      </div>
+
+      <div class="summary-cards">
+        <div class="summary-card income">
+          <div class="card-label">Einnahmen</div>
+          <div class="card-value" id="sum-income">0,00 €</div>
+        </div>
+        <div class="summary-card expense">
+          <div class="card-label">Ausgaben</div>
+          <div class="card-value" id="sum-expense">0,00 €</div>
+        </div>
+        <div class="summary-card balance">
+          <div class="card-label">Bilanz</div>
+          <div class="card-value" id="sum-balance">0,00 €</div>
+        </div>
+        <div class="summary-card transactions">
+          <div class="card-label">Transaktionen</div>
+          <div class="card-value" id="sum-count">0</div>
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Ausgaben nach Kategorie</h2>
+            <div class="legend-toggle">
+              <button class="chip active" data-chart-type="expense">Ausgaben</button>
+              <button class="chip" data-chart-type="income">Einnahmen</button>
+            </div>
+          </div>
+          <div class="donut-container">
+            <div id="donut-chart" class="donut-chart"></div>
+            <ul class="donut-legend" id="donut-legend"></ul>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Verlauf</h2>
+          </div>
+          <div id="trend-chart" class="trend-chart"></div>
+        </div>
+
+        <div class="panel panel-wide">
+          <div class="panel-header">
+            <h2>Top-Kategorien</h2>
+          </div>
+          <ul class="top-list" id="top-list"></ul>
+        </div>
+
+        <div class="panel panel-wide">
+          <div class="panel-header">
+            <h2>Letzte Einträge</h2>
+            <button class="btn-text" data-view="entries">Alle anzeigen →</button>
+          </div>
+          <ul class="entries-list compact" id="recent-entries"></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== ENTRIES ========== -->
+    <section class="view" id="view-entries">
+      <div class="view-header">
+        <h1>Einträge</h1>
+        <div class="entries-controls">
+          <input type="search" id="entries-search" placeholder="Suchen..." aria-label="Einträge durchsuchen">
+          <select id="entries-filter-type" aria-label="Typ filtern">
+            <option value="all">Alle Typen</option>
+            <option value="expense">Ausgaben</option>
+            <option value="income">Einnahmen</option>
+          </select>
+          <select id="entries-filter-category" aria-label="Kategorie filtern">
+            <option value="all">Alle Kategorien</option>
+          </select>
+        </div>
+      </div>
+      <ul class="entries-list" id="entries-list"></ul>
+      <div class="empty-state" id="entries-empty" hidden>
+        <p>Noch keine Einträge vorhanden.</p>
+        <button class="btn-primary" id="empty-add-btn">Ersten Eintrag erstellen</button>
+      </div>
+    </section>
+
+    <!-- ========== CATEGORIES ========== -->
+    <section class="view" id="view-categories">
+      <div class="view-header">
+        <h1>Kategorien</h1>
+        <button class="btn-primary" id="add-category-btn">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Neue Kategorie
+        </button>
+      </div>
+      <div class="categories-section">
+        <h2>Ausgaben</h2>
+        <ul class="categories-grid" id="categories-expense"></ul>
+      </div>
+      <div class="categories-section">
+        <h2>Einnahmen</h2>
+        <ul class="categories-grid" id="categories-income"></ul>
+      </div>
+    </section>
+
+    <!-- ========== SETTINGS ========== -->
+    <section class="view" id="view-settings">
+      <div class="view-header">
+        <h1>Einstellungen</h1>
+      </div>
+
+      <div class="settings-section">
+        <h2>Datensicherung & Sync</h2>
+        <p class="hint">
+          Exportiere deine Daten regelmäßig als JSON-Backup. Auf dem Handy öffnet sich das Teilen-Menü —
+          so legst du das Backup mit einem Tipp in OneDrive, Drive o.ä. ab. Über „Importieren“ lädst du es
+          auf einem anderen Gerät (z.B. dem Laptop für den Überblick).
+        </p>
+        <div class="button-row">
+          <button class="btn-primary" id="export-json-btn">JSON-Backup exportieren</button>
+          <button class="btn-secondary" id="import-json-btn">Aus JSON importieren</button>
+          <input type="file" id="import-json-input" accept=".json,application/json" hidden>
+        </div>
+        <h3>Tabellen-Export</h3>
+        <p class="hint">CSV öffnet sich in Excel, LibreOffice, Numbers usw. (Semikolon-getrennt, UTF-8 mit BOM).</p>
+        <div class="button-row">
+          <button class="btn-secondary" id="export-csv-btn">CSV exportieren</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h2>Darstellung</h2>
+        <div class="settings-row">
+          <label for="theme-select">Design</label>
+          <select id="theme-select">
+            <option value="auto">Automatisch (Systemeinstellung)</option>
+            <option value="light">Hell</option>
+            <option value="dark">Dunkel</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <label for="currency-select">Währung</label>
+          <select id="currency-select">
+            <option value="EUR">Euro (€)</option>
+            <option value="USD">US-Dollar ($)</option>
+            <option value="GBP">Pfund (£)</option>
+            <option value="CHF">Schweizer Franken (CHF)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings-section danger">
+        <h2>Daten löschen</h2>
+        <p class="hint">Setzt alle Einträge und Kategorien auf den Auslieferungszustand zurück. Vorher exportieren!</p>
+        <button class="btn-danger" id="reset-data-btn">Alle Daten zurücksetzen</button>
+      </div>
+
+      <div class="settings-section">
+        <h2>App installieren</h2>
+        <p class="hint" id="install-hint">
+          Über das Browser-Menü kannst du diese App auf Handy und Laptop als App installieren —
+          danach läuft sie offline wie eine native App.
+        </p>
+        <button class="btn-primary" id="install-btn" hidden>Jetzt installieren</button>
+      </div>
+
+      <div class="settings-section about">
+        <h2>Über</h2>
+        <p class="hint">Haushaltsplan v1.0 · Offline-PWA · Daten bleiben lokal auf deinem Gerät.</p>
+      </div>
+    </section>
+  </main>
+
+  <button class="fab" id="fab-add" aria-label="Neuer Eintrag">
+    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>
+
+  <nav class="bottom-nav" aria-label="Hauptnavigation mobil">
+    <button class="bottom-nav-btn" data-view="dashboard" aria-current="page">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l2-2 4 4 8-8 4 4"/><path d="M3 21h18"/></svg>
+      <span>Dashboard</span>
+    </button>
+    <button class="bottom-nav-btn" data-view="entries">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <span>Einträge</span>
+    </button>
+    <button class="bottom-nav-btn" data-view="categories">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+      <span>Kategorien</span>
+    </button>
+    <button class="bottom-nav-btn" data-view="settings">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Mehr</span>
+    </button>
+  </nav>
+
+  <!-- ========== ENTRY MODAL ========== -->
+  <div class="modal-backdrop" id="entry-modal" hidden>
+    <div class="modal" role="dialog" aria-labelledby="entry-modal-title" aria-modal="true">
+      <div class="modal-header">
+        <h2 id="entry-modal-title">Neuer Eintrag</h2>
+        <button class="icon-btn" data-close-modal aria-label="Schließen">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form class="modal-body" id="entry-form">
+        <div class="type-toggle">
+          <input type="radio" name="entry-type" id="type-expense" value="expense" checked>
+          <label for="type-expense">Ausgabe</label>
+          <input type="radio" name="entry-type" id="type-income" value="income">
+          <label for="type-income">Einnahme</label>
+        </div>
+
+        <div class="form-row">
+          <label for="entry-amount">Betrag</label>
+          <div class="amount-input">
+            <input type="number" step="0.01" min="0" id="entry-amount" required inputmode="decimal" placeholder="0,00">
+            <span class="currency-suffix" id="currency-suffix">€</span>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label for="entry-description">Beschreibung</label>
+          <input type="text" id="entry-description" required placeholder="z.B. Wocheneinkauf">
+        </div>
+
+        <div class="form-row">
+          <label for="entry-category">Kategorie</label>
+          <select id="entry-category" required></select>
+        </div>
+
+        <div class="form-row">
+          <label for="entry-date">Datum</label>
+          <input type="date" id="entry-date" required>
+        </div>
+
+        <div class="form-row">
+          <label for="entry-recurrence">Wiederholung</label>
+          <select id="entry-recurrence">
+            <option value="none">Einmalig</option>
+            <option value="daily">Täglich</option>
+            <option value="weekly">Wöchentlich</option>
+            <option value="biweekly">14-täglich</option>
+            <option value="monthly">Monatlich</option>
+            <option value="quarterly">Vierteljährlich</option>
+            <option value="yearly">Jährlich</option>
+          </select>
+        </div>
+
+        <div class="form-row" id="recurrence-end-row" hidden>
+          <label for="entry-recurrence-end">Wiederholung endet am (optional)</label>
+          <input type="date" id="entry-recurrence-end">
+        </div>
+
+        <div class="form-row">
+          <label for="entry-note">Notiz (optional)</label>
+          <textarea id="entry-note" rows="2" placeholder="Zusätzliche Details"></textarea>
+        </div>
+
+        <input type="hidden" id="entry-id">
+
+        <div class="modal-footer">
+          <button type="button" class="btn-danger" id="delete-entry-btn" hidden>Löschen</button>
+          <div class="spacer"></div>
+          <button type="button" class="btn-secondary" data-close-modal>Abbrechen</button>
+          <button type="submit" class="btn-primary">Speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========== CATEGORY MODAL ========== -->
+  <div class="modal-backdrop" id="category-modal" hidden>
+    <div class="modal" role="dialog" aria-labelledby="category-modal-title" aria-modal="true">
+      <div class="modal-header">
+        <h2 id="category-modal-title">Neue Kategorie</h2>
+        <button class="icon-btn" data-close-modal aria-label="Schließen">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <form class="modal-body" id="category-form">
+        <div class="type-toggle">
+          <input type="radio" name="category-type" id="cat-type-expense" value="expense" checked>
+          <label for="cat-type-expense">Ausgaben</label>
+          <input type="radio" name="category-type" id="cat-type-income" value="income">
+          <label for="cat-type-income">Einnahmen</label>
+        </div>
+
+        <div class="form-row">
+          <label for="category-name">Name</label>
+          <input type="text" id="category-name" required placeholder="z.B. Lebensmittel">
+        </div>
+
+        <div class="form-row">
+          <label for="category-icon">Symbol (Emoji)</label>
+          <input type="text" id="category-icon" maxlength="4" placeholder="🛒" required>
+        </div>
+
+        <div class="form-row">
+          <label>Farbe</label>
+          <div class="color-picker" id="color-picker"></div>
+          <input type="hidden" id="category-color" value="#0ea5e9">
+        </div>
+
+        <input type="hidden" id="category-id">
+
+        <div class="modal-footer">
+          <button type="button" class="btn-danger" id="delete-category-btn" hidden>Löschen</button>
+          <div class="spacer"></div>
+          <button type="button" class="btn-secondary" data-close-modal>Abbrechen</button>
+          <button type="submit" class="btn-primary">Speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========== CONFIRM MODAL ========== -->
+  <div class="modal-backdrop" id="confirm-modal" hidden>
+    <div class="modal small" role="dialog" aria-modal="true">
+      <div class="modal-body">
+        <h2 id="confirm-title">Bestätigen</h2>
+        <p id="confirm-message">Bist du sicher?</p>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" data-close-modal>Abbrechen</button>
+          <button type="button" class="btn-danger" id="confirm-ok">Bestätigen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== TOAST ========== -->
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

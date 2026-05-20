@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#0369a1"/>
+    </linearGradient>
+    <linearGradient id="ring1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+    <linearGradient id="ring2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <linearGradient id="ring3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f87171"/>
+      <stop offset="100%" stop-color="#ef4444"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <g transform="translate(256 256)">
+    <circle r="120" fill="none" stroke="#0c4a6e" stroke-width="36" opacity="0.3"/>
+    <circle r="120" fill="none" stroke="url(#ring1)" stroke-width="36"
+            stroke-dasharray="226 754" stroke-dashoffset="0" stroke-linecap="round"
+            transform="rotate(-90)"/>
+    <circle r="120" fill="none" stroke="url(#ring2)" stroke-width="36"
+            stroke-dasharray="151 754" stroke-dashoffset="-226" stroke-linecap="round"
+            transform="rotate(-90)"/>
+    <circle r="120" fill="none" stroke="url(#ring3)" stroke-width="36"
+            stroke-dasharray="113 754" stroke-dashoffset="-377" stroke-linecap="round"
+            transform="rotate(-90)"/>
+    <text text-anchor="middle" dominant-baseline="central" y="8"
+          font-family="system-ui, sans-serif" font-size="80" font-weight="700" fill="#fff">€</text>
+  </g>
+</svg>

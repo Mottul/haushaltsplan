@@ -1,0 +1,21 @@
+{
+  "name": "Haushaltsplan",
+  "short_name": "Haushaltsplan",
+  "description": "Persönlicher Haushaltsplan und Expense-Tracker — offline nutzbar",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#0ea5e9",
+  "lang": "de",
+  "categories": ["finance", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
