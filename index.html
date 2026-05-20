@@ -121,6 +121,29 @@
 
         <div class="panel panel-wide">
           <div class="panel-header">
+            <h2>Einnahmen vs. Ausgaben</h2>
+          </div>
+          <div class="comparison" id="comparison"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Budgets</h2>
+            <span class="panel-sub">akt. Monat</span>
+          </div>
+          <ul class="budget-list" id="budget-list"></ul>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <h2>Anstehende Zahlungen</h2>
+            <span class="panel-sub">30 Tage</span>
+          </div>
+          <ul class="upcoming-list" id="upcoming-list"></ul>
+        </div>
+
+        <div class="panel panel-wide">
+          <div class="panel-header">
             <h2>Top-Kategorien</h2>
           </div>
           <ul class="top-list" id="top-list"></ul>
@@ -150,8 +173,20 @@
           <select id="entries-filter-category" aria-label="Kategorie filtern">
             <option value="all">Alle Kategorien</option>
           </select>
+          <select id="entries-filter-recurrence" aria-label="Wiederholung filtern">
+            <option value="all">Alle Einträge</option>
+            <option value="once">Nur einmalige</option>
+            <option value="recurring">Nur wiederkehrende</option>
+          </select>
+          <select id="entries-sort" aria-label="Sortierung">
+            <option value="date-desc">Neueste zuerst</option>
+            <option value="date-asc">Älteste zuerst</option>
+            <option value="amount-desc">Betrag absteigend</option>
+            <option value="amount-asc">Betrag aufsteigend</option>
+          </select>
         </div>
       </div>
+      <div class="entries-summary" id="entries-summary" hidden></div>
       <ul class="entries-list" id="entries-list"></ul>
       <div class="empty-state" id="entries-empty" hidden>
         <p>Noch keine Einträge vorhanden.</p>
@@ -204,6 +239,19 @@
       </div>
 
       <div class="settings-section">
+        <h2>Automatische Sicherungen</h2>
+        <p class="hint">
+          Die App legt automatisch lokale Wiederherstellungspunkte auf diesem Gerät an — praktisch, um eine
+          Fehleingabe oder ein versehentliches Zurücksetzen rückgängig zu machen.
+          <strong>Das ersetzt kein Cloud-Backup</strong> bei Geräteverlust — dafür den JSON-Export nutzen.
+        </p>
+        <div class="button-row">
+          <button class="btn-secondary" id="snapshot-now-btn">Sicherungspunkt erstellen</button>
+        </div>
+        <ul class="snapshots-list" id="snapshots-list"></ul>
+      </div>
+
+      <div class="settings-section">
         <h2>Darstellung</h2>
         <div class="settings-row">
           <label for="theme-select">Design</label>
@@ -241,7 +289,7 @@
 
       <div class="settings-section about">
         <h2>Über</h2>
-        <p class="hint">Haushaltsplan v1.0 · Offline-PWA · Daten bleiben lokal auf deinem Gerät.</p>
+        <p class="hint">Haushaltsplan v1.2 · Offline-PWA · Daten bleiben lokal auf deinem Gerät.</p>
       </div>
     </section>
   </main>
@@ -336,6 +384,7 @@
 
         <div class="modal-footer">
           <button type="button" class="btn-danger" id="delete-entry-btn" hidden>Löschen</button>
+          <button type="button" class="btn-secondary" id="duplicate-entry-btn" hidden>Duplizieren</button>
           <div class="spacer"></div>
           <button type="button" class="btn-secondary" data-close-modal>Abbrechen</button>
           <button type="submit" class="btn-primary">Speichern</button>
@@ -377,6 +426,14 @@
           <input type="hidden" id="category-color" value="#0ea5e9">
         </div>
 
+        <div class="form-row" id="category-budget-row">
+          <label for="category-budget">Monatliches Budget (optional)</label>
+          <div class="amount-input">
+            <input type="number" step="0.01" min="0" id="category-budget" inputmode="decimal" placeholder="z.B. 300">
+            <span class="currency-suffix" id="budget-currency-suffix">€</span>
+          </div>
+        </div>
+
         <input type="hidden" id="category-id">
 
         <div class="modal-footer">
@@ -405,6 +462,9 @@
 
   <!-- ========== TOAST ========== -->
   <div class="toast" id="toast" hidden></div>
+
+  <!-- ========== CHART TOOLTIP ========== -->
+  <div class="chart-tooltip" id="chart-tooltip" hidden></div>
 
   <script src="app.js"></script>
 </body>
