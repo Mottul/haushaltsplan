@@ -923,13 +923,21 @@
   function saveRules(rules) {
     try { localStorage.setItem(RULES_KEY, JSON.stringify(rules)); } catch (e) { /* unkritisch */ }
   }
-  function addRule(key, categoryName, amount) {
+  function addRule(key, categoryName, amount, exclude) {
     if (!key) return;
     const K = key.toUpperCase();
     const amt = amount != null ? Math.abs(amount) : null;
     const rules = loadRules().filter((r) => !(r.key === K && r.amount === amt));
-    rules.push({ key: K, cat: categoryName, amount: amt });
+    rules.push({ key: K, cat: categoryName, amount: amt, exclude: exclude != null ? exclude : null });
     saveRules(rules);
+  }
+
+  function matchedRule(text, amount) {
+    const t = String(text).toUpperCase();
+    for (const r of loadRules()) {
+      if (r.key && t.includes(r.key) && (r.amount == null || Math.abs(Math.abs(amount) - r.amount) < 0.005)) return r;
+    }
+    return null;
   }
 
   function ownIdentifiers() {
@@ -947,39 +955,184 @@
     return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
   }
 
-  function splitCsvLine(line) {
-    const out = [];
-    let cur = '', inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
+  // Generischer CSV-Parser (beliebiger Trenner, Quotes mit "" + Zeilenumbrüche in Feldern)
+  function parseCsvRows(text, delim) {
+    const rows = [];
+    let row = [], cur = '', inQ = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
       if (inQ) {
-        if (ch === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else inQ = false; }
+        if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else inQ = false; }
         else cur += ch;
       } else if (ch === '"') inQ = true;
-      else if (ch === ';') { out.push(cur); cur = ''; }
-      else cur += ch;
+      else if (ch === delim) { row.push(cur); cur = ''; }
+      else if (ch === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+      else if (ch !== '\r') cur += ch;
     }
-    out.push(cur);
+    if (cur !== '' || row.length) { row.push(cur); rows.push(row); }
+    return rows;
+  }
+
+  function detectFormat(text) {
+    const head = text.slice(0, 3000);
+    if (/"datetime","date"/.test(head) || /"transaction_id"/.test(head)) return 'tr';
+    if (/Venue:\s*Bitpanda/i.test(head) || /"Transaction ID",Timestamp/.test(head)) return 'bitpanda';
+    const firstLine = head.split(/\r?\n/).find((l) => l.trim()) || '';
+    if (/^Buchungstag;Valuta/i.test(firstLine)) return 'flatex';
+    if (/^\d{2}\.\d{2}\.\d{4};/.test(firstLine)) return 'elba';
+    return null;
+  }
+
+  // Merchant Category Codes → Kategorie (für Trade-Republic-Kartenzahlungen)
+  const MCC_CATEGORY = {
+    '5411': 'Lebensmittel', '5422': 'Lebensmittel', '5451': 'Lebensmittel', '5462': 'Lebensmittel', '5499': 'Lebensmittel',
+    '5811': 'Restaurant & Café', '5812': 'Restaurant & Café', '5813': 'Restaurant & Café', '5814': 'Restaurant & Café',
+    '5912': 'Drogerie', '5122': 'Drogerie',
+    '8062': 'Gesundheit', '8011': 'Gesundheit', '8021': 'Gesundheit', '8042': 'Gesundheit', '8043': 'Gesundheit',
+    '5942': 'Bildung', '5943': 'Bildung', '8211': 'Bildung', '8220': 'Bildung', '8299': 'Bildung',
+    '5541': 'Auto', '5542': 'Auto', '5533': 'Auto', '7523': 'Auto', '7538': 'Auto', '7549': 'Auto',
+    '4111': 'Transport', '4112': 'Transport', '4131': 'Transport', '4789': 'Transport',
+    '5993': 'Tabak',
+    '5200': 'Haushalt & Heimwerker', '5211': 'Haushalt & Heimwerker', '5251': 'Haushalt & Heimwerker', '5712': 'Haushalt & Heimwerker', '5722': 'Haushalt & Heimwerker',
+    '5611': 'Kleidung', '5621': 'Kleidung', '5641': 'Kleidung', '5651': 'Kleidung', '5661': 'Kleidung', '5691': 'Kleidung', '5699': 'Kleidung',
+    '5945': 'Geschenke', '5947': 'Geschenke', '5948': 'Geschenke',
+    '7991': 'Freizeit', '7997': 'Freizeit', '7999': 'Freizeit', '7832': 'Freizeit', '7941': 'Freizeit', '7911': 'Freizeit',
+    '8398': 'Spenden', '8661': 'Spenden',
+    '5311': 'Sonstiges', '5331': 'Sonstiges', '5399': 'Sonstiges',
+  };
+
+  const findCatDef = (name) =>
+    DEFAULT_CATEGORIES.find((d) => d.name === name) || state.categories.find((c) => c.name === name);
+
+  function makeRow(importKey, date, amount, desc, rawText, category, exclude, existing) {
+    return {
+      importKey, date, rawText,
+      amount, type: amount > 0 ? 'income' : 'expense',
+      desc: (desc || '').trim() || 'Buchung',
+      category, exclude: !!exclude, remember: false,
+      dup: existing.has(importKey),
+    };
+  }
+
+  // --- meinELBA (Girokonto) ---
+  function parseElba(text, existing) {
+    const out = [];
+    for (const f of parseCsvRows(text, ';')) {
+      if (f.length < 6 || !/^\d{2}\.\d{2}\.\d{4}$/.test((f[0] || '').trim())) continue;
+      const amount = parseAmountDe(f[3]);
+      if (!isFinite(amount) || amount === 0) continue;
+      const rawText = f[1];
+      const cat = categorizeTx(rawText, amount);
+      const mr = matchedRule(rawText, amount);
+      const def = findCatDef(cat);
+      const exclude = mr && mr.exclude != null ? mr.exclude : !!(def && def.exclude);
+      const key = (f[5] || '').trim() || `elba|${f[0]}|${f[3]}|${f[1].slice(0, 24)}`;
+      out.push(makeRow(key, isoFromDe((f[2] || f[0]).trim()), amount, extractDesc(rawText), rawText, cat, exclude, existing));
+    }
     return out;
   }
 
-  function parseBankCsv(text) {
-    const lines = text.split(/\r\n|\n|\r/);
-    const txs = [];
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      const f = splitCsvLine(line);
-      if (f.length < 6 || !/^\d{2}\.\d{2}\.\d{4}$/.test(f[0].trim())) continue;
-      const amount = parseAmountDe(f[3]);
+  // --- Trade Republic ---
+  function parseTradeRepublic(text, existing) {
+    const rows = parseCsvRows(text, ',');
+    if (!rows.length) return [];
+    const head = rows[0].map((h) => h.trim());
+    const ix = (n) => head.indexOf(n);
+    const out = [];
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r || r.length < 5) continue;
+      const amtStr = (r[ix('amount')] || '').trim();
+      if (!amtStr) continue;
+      const amount = parseFloat(amtStr);
       if (!isFinite(amount) || amount === 0) continue;
-      txs.push({
-        rawText: f[1],
-        amount,
-        date: isoFromDe(f[2].trim() || f[0].trim()),
-        importKey: (f[5] || '').trim() || `${f[0].trim()}|${f[3].trim()}|${f[1].slice(0, 24)}`,
-      });
+      const type = (r[ix('type')] || '').trim();
+      const name = (r[ix('name')] || '').trim();
+      const descCol = (r[ix('description')] || '').trim();
+      const mcc = (r[ix('mcc_code')] || '').trim();
+      let cat, exclude = false, label;
+      if (type === 'CARD_TRANSACTION') {
+        cat = categorizeTx(name, -1);
+        if (cat === 'Sonstiges' && MCC_CATEGORY[mcc]) cat = MCC_CATEGORY[mcc];
+        label = name || descCol;
+      } else if (type === 'INTEREST_PAYMENT') {
+        cat = 'Kapitalerträge'; exclude = true; label = 'Zinsen (Trade Republic)';
+      } else if (type === 'BUY' || type === 'SELL') {
+        cat = 'Sparen & Anlage'; exclude = true; label = (type === 'BUY' ? 'Kauf ' : 'Verkauf ') + name;
+      } else if (/TRANSFER|INPAYMENT/.test(type)) {
+        cat = 'Umbuchung'; exclude = true; label = 'Übertrag (Trade Republic)';
+      } else {
+        cat = 'Sonstiges'; label = name || descCol || type;
+      }
+      const key = (r[ix('transaction_id')] || '').trim() || `tr|${r[ix('date')]}|${amtStr}`;
+      out.push(makeRow(key, (r[ix('date')] || '').trim(), amount, label, `[Trade Republic] ${type} ${name} ${descCol}`.trim(), cat, exclude, existing));
     }
-    return txs;
+    return out;
+  }
+
+  // --- Flatex (Depot) ---
+  function parseFlatex(text, existing) {
+    const out = [];
+    for (const f of parseCsvRows(text, ';')) {
+      if (f.length < 7 || !/^\d{2}\.\d{2}\.\d{4}$/.test((f[0] || '').trim())) continue;
+      const amount = parseAmountDe(f[6]);
+      if (!isFinite(amount) || amount === 0) continue;
+      const empf = (f[2] || '').trim();
+      const info = (f[5] || '').trim();
+      const U = (info + ' ' + empf + ' ' + (f[3] || '')).toUpperCase();
+      let cat, exclude = false, label;
+      if (/ERTRÄGNIS|ERTRAGNIS|DIVIDEND|ZINSABSCHLUSS/.test(U)) {
+        cat = 'Kapitalerträge'; exclude = true; label = 'Erträge (Flatex)';
+      } else if (/ORDER|KAUF|VERKAUF|THESAURIERUNG/.test(U)) {
+        cat = 'Sparen & Anlage'; exclude = true; label = info.slice(0, 40);
+      } else {
+        cat = 'Umbuchung'; exclude = true; label = 'Übertrag (Flatex)';
+      }
+      const key = (f[4] || '').trim() ? `flatex|${f[4].trim()}` : `flatex|${f[0]}|${f[6]}`;
+      out.push(makeRow(key, isoFromDe((f[1] || f[0]).trim()), amount, label, `[Flatex] ${info} ${empf}`.trim(), cat, exclude, existing));
+    }
+    return out;
+  }
+
+  // --- Bitpanda ---
+  function parseBitpanda(text, existing) {
+    const rows = parseCsvRows(text, ',');
+    const h = rows.findIndex((r) => (r[0] || '').trim() === 'Transaction ID');
+    if (h < 0) return [];
+    const head = rows[h].map((s) => s.trim());
+    const ix = (n) => head.indexOf(n);
+    const out = [];
+    for (let i = h + 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r || r.length < 5) continue;
+      const ttype = (r[ix('Transaction Type')] || '').toLowerCase();
+      if (ttype.startsWith('transfer')) continue; // interne Staking-Bewegungen (netto 0)
+      const mag = parseFloat(r[ix('Amount Fiat')]);
+      if (!isFinite(mag) || mag === 0) continue;
+      const amount = (r[ix('In/Out')] || '').toLowerCase() === 'outgoing' ? -mag : mag;
+      const asset = (r[ix('Asset')] || '').trim();
+      let cat, exclude = false, label;
+      if (ttype === 'deposit' || ttype === 'withdrawal') {
+        cat = 'Umbuchung'; exclude = true; label = 'Übertrag (Bitpanda)';
+      } else if (ttype === 'buy' || ttype === 'sell') {
+        cat = 'Sparen & Anlage'; exclude = true; label = (ttype === 'buy' ? 'Kauf ' : 'Verkauf ') + asset;
+      } else if (ttype === 'reward' || ttype.includes('stake')) {
+        cat = 'Kapitalerträge'; exclude = true; label = 'Staking ' + asset;
+      } else {
+        cat = 'Sparen & Anlage'; exclude = true; label = ttype;
+      }
+      const ts = (r[ix('Timestamp')] || '').trim();
+      const key = (r[0] || '').trim() ? `bp|${r[0].trim()}` : `bp|${ts}|${mag}`;
+      out.push(makeRow(key, ts.slice(0, 10), amount, label, `[Bitpanda] ${ttype} ${asset}`.trim(), cat, exclude, existing));
+    }
+    return out;
+  }
+
+  function buildImportRows(text) {
+    const existing = new Set(state.entries.map((e) => e.importKey).filter(Boolean));
+    const fmt = detectFormat(text);
+    const map = { elba: parseElba, tr: parseTradeRepublic, flatex: parseFlatex, bitpanda: parseBitpanda };
+    return { fmt, rows: fmt ? map[fmt](text, existing) : [] };
   }
 
   function extractDesc(text) {
@@ -999,10 +1152,9 @@
   }
 
   function categorizeTx(text, amount) {
+    const mr = matchedRule(text, amount);
+    if (mr) return mr.cat;
     const t = text.toUpperCase();
-    for (const r of loadRules()) {
-      if (r.key && t.includes(r.key) && (r.amount == null || Math.abs(Math.abs(amount) - r.amount) < 0.005)) return r.cat;
-    }
     const isIncome = amount > 0;
     const ownHit = ownIdentifiers().some((id) => t.includes(id));
 
@@ -1030,6 +1182,8 @@
     return [...names];
   }
 
+  let importFormat = null;
+
   async function handleBankCsv(file) {
     let text;
     try {
@@ -1041,38 +1195,40 @@
       showToast('Datei konnte nicht gelesen werden.');
       return;
     }
-    const txs = parseBankCsv(text);
-    if (!txs.length) {
-      showToast('Keine Buchungen erkannt — ist das eine meinELBA-CSV?');
+    const { fmt, rows } = buildImportRows(text);
+    if (!fmt) {
+      showToast('Format nicht erkannt (meinELBA, Trade Republic, Flatex, Bitpanda).');
       return;
     }
-    const existing = new Set(state.entries.map((e) => e.importKey).filter(Boolean));
-    importRows = txs.map((tx) => {
-      const catName = categorizeTx(tx.rawText, tx.amount);
-      const def = DEFAULT_CATEGORIES.find((d) => d.name === catName);
-      return {
-        importKey: tx.importKey,
-        date: tx.date,
-        rawText: tx.rawText,
-        desc: extractDesc(tx.rawText),
-        amount: tx.amount,
-        type: tx.amount > 0 ? 'income' : 'expense',
-        category: catName,
-        exclude: !!(def && def.exclude),
-        remember: false,
-        dup: existing.has(tx.importKey),
-      };
-    });
+    if (!rows.length) {
+      showToast('Keine importierbaren Buchungen gefunden.');
+      return;
+    }
+    importFormat = fmt;
+    importRows = rows;
     renderImportPreview();
     openModal('import-modal');
   }
 
+  function willImport(r) {
+    if (r.dup) return false;
+    if (el('import-skip-excluded').checked && r.exclude) return false;
+    if (el('import-skip-small').checked && Math.abs(r.amount) < (parseFloat(el('import-small-threshold').value) || 0)) return false;
+    return true;
+  }
+
   function renderImportPreview() {
-    const newRows = importRows.filter((r) => !r.dup);
-    const dupCount = importRows.length - newRows.length;
-    el('import-summary').textContent =
-      `${newRows.length} neue Buchung${newRows.length === 1 ? '' : 'en'}` +
-      (dupCount ? ` · ${dupCount} bereits vorhanden (übersprungen)` : '');
+    const fmtLabel = { elba: 'meinELBA', tr: 'Trade Republic', flatex: 'Flatex', bitpanda: 'Bitpanda' }[importFormat] || 'CSV';
+    let imp = 0, dup = 0, skip = 0;
+    for (const r of importRows) {
+      if (r.dup) dup++;
+      else if (willImport(r)) imp++;
+      else skip++;
+    }
+    let s = `Quelle: ${fmtLabel} · ${imp} werden importiert`;
+    if (dup) s += ` · ${dup} Duplikate`;
+    if (skip) s += ` · ${skip} per Filter übersprungen`;
+    el('import-summary').textContent = s;
 
     const optionsHtml = (sel) =>
       importCategoryNames().map((n) => `<option${n === sel ? ' selected' : ''}>${esc(n)}</option>`).join('');
@@ -1081,24 +1237,26 @@
       .map((r, i) => {
         const sign = r.type === 'income' ? '+' : '−';
         const amt = `<td class="imp-amt ${r.type}">${sign}${esc(formatMoney(Math.abs(r.amount)))}</td>`;
+        const base = `<td>${formatDateDisplay(r.date)}</td><td class="imp-desc" title="${esc(r.rawText)}">${esc(r.desc)}</td>${amt}`;
         if (r.dup) {
-          return `<tr class="imp-row dup"><td>${formatDateDisplay(r.date)}</td><td class="imp-desc">${esc(r.desc)}</td>${amt}<td colspan="3"><span class="imp-dup">bereits importiert</span></td></tr>`;
+          return `<tr class="imp-row dup">${base}<td colspan="3"><span class="imp-dup">bereits importiert</span></td></tr>`;
+        }
+        if (!willImport(r)) {
+          return `<tr class="imp-row skip">${base}<td colspan="3"><span class="imp-dup">per Filter übersprungen</span></td></tr>`;
         }
         return `<tr class="imp-row" data-idx="${i}">
-          <td>${formatDateDisplay(r.date)}</td>
-          <td class="imp-desc" title="${esc(r.rawText)}">${esc(r.desc)}</td>
-          ${amt}
+          ${base}
           <td><select class="imp-cat" data-idx="${i}">${optionsHtml(r.category)}</select></td>
           <td class="imp-center"><input type="checkbox" class="imp-excl" data-idx="${i}"${r.exclude ? ' checked' : ''}></td>
-          <td class="imp-center"><input type="checkbox" class="imp-rem" data-idx="${i}"></td>
+          <td class="imp-center"><input type="checkbox" class="imp-rem" data-idx="${i}"${r.remember ? ' checked' : ''}></td>
         </tr>`;
       })
       .join('');
-    el('import-commit-btn').disabled = newRows.length === 0;
+    el('import-commit-btn').disabled = imp === 0;
   }
 
   function commitImport() {
-    const toImport = importRows.filter((r) => !r.dup);
+    const toImport = importRows.filter(willImport);
     if (!toImport.length) { closeModal('import-modal'); return; }
     takeSnapshot('Vor Import', true);
     if (el('import-clear-existing').checked) state.entries = [];
@@ -1106,8 +1264,8 @@
     for (const r of toImport) {
       const cat = ensureCategory(r.category, r.type);
       if (r.remember && r.desc) {
-        if (/PAYPAL/i.test(r.rawText)) addRule('PAYPAL', r.category, Math.abs(r.amount));
-        else addRule(r.desc, r.category, null);
+        if (/PAYPAL/i.test(r.rawText)) addRule('PAYPAL', r.category, Math.abs(r.amount), r.exclude);
+        else addRule(r.desc, r.category, null, r.exclude);
       }
       state.entries.push({
         id: uid(),
@@ -1594,16 +1752,19 @@
       if (isNaN(i) || !importRows[i]) return;
       if (t.classList.contains('imp-cat')) {
         importRows[i].category = t.value;
-        const def = DEFAULT_CATEGORIES.find((d) => d.name === t.value);
+        const def = findCatDef(t.value);
         importRows[i].exclude = !!(def && def.exclude);
-        const cb = el('import-tbody').querySelector(`.imp-excl[data-idx="${i}"]`);
-        if (cb) cb.checked = importRows[i].exclude;
+        renderImportPreview();
       } else if (t.classList.contains('imp-excl')) {
         importRows[i].exclude = t.checked;
+        renderImportPreview();
       } else if (t.classList.contains('imp-rem')) {
         importRows[i].remember = t.checked;
       }
     });
+    el('import-skip-excluded').addEventListener('change', renderImportPreview);
+    el('import-skip-small').addEventListener('change', renderImportPreview);
+    el('import-small-threshold').addEventListener('input', renderImportPreview);
     el('own-identifiers').addEventListener('input', (e) => {
       state.settings.ownIdentifiers = e.target.value;
       save();

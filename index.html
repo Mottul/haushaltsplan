@@ -239,13 +239,14 @@
       </div>
 
       <div class="settings-section">
-        <h2>Bank-Import (CSV)</h2>
+        <h2>Konto-/Depot-Import (CSV)</h2>
         <p class="hint">
-          Importiere Kontoumsätze aus meinELBA (Raiffeisen). Buchungen werden automatisch kategorisiert —
-          in der Vorschau kannst du jede Zeile anpassen. Bereits importierte Buchungen werden erkannt und übersprungen.
+          Importiere CSV-Exporte von <strong>meinELBA</strong> (Raiffeisen), <strong>Trade Republic</strong>,
+          <strong>Flatex</strong> oder <strong>Bitpanda</strong> — das Format wird automatisch erkannt. Buchungen werden
+          kategorisiert; in der Vorschau passt du jede Zeile an. Bereits importierte Buchungen werden erkannt und übersprungen.
         </p>
         <div class="button-row">
-          <button class="btn-primary" id="import-bank-btn">Bank-CSV importieren</button>
+          <button class="btn-primary" id="import-bank-btn">CSV importieren</button>
           <input type="file" id="import-bank-input" accept=".csv,text/csv" hidden>
         </div>
         <div class="form-row" style="margin-top:14px">
@@ -480,7 +481,7 @@
   <div class="modal-backdrop" id="import-modal" hidden>
     <div class="modal large" role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
       <div class="modal-header">
-        <h2 id="import-modal-title">Bank-CSV importieren</h2>
+        <h2 id="import-modal-title">CSV importieren</h2>
         <button class="icon-btn" data-close-modal aria-label="Schließen">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -495,7 +496,11 @@
             <tbody id="import-tbody"></tbody>
           </table>
         </div>
-        <label class="import-clear"><input type="checkbox" id="import-clear-existing"> Vorhandene Einträge vorher löschen (Neustart mit diesem Import)</label>
+        <div class="import-options">
+          <label class="import-clear"><input type="checkbox" id="import-skip-excluded"> Ausgeschlossene Buchungen (Umbuchungen/Anlagen) nicht importieren</label>
+          <label class="import-clear"><input type="checkbox" id="import-skip-small"> Mini-Beträge unter <input type="number" id="import-small-threshold" value="1" min="0" step="0.5" class="import-thr"> € überspringen</label>
+          <label class="import-clear"><input type="checkbox" id="import-clear-existing"> Vorhandene Einträge vorher löschen (Neustart mit diesem Import)</label>
+        </div>
         <div class="modal-footer">
           <div class="spacer"></div>
           <button type="button" class="btn-secondary" data-close-modal>Abbrechen</button>
