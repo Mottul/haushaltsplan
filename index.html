@@ -239,6 +239,22 @@
       </div>
 
       <div class="settings-section">
+        <h2>Bank-Import (CSV)</h2>
+        <p class="hint">
+          Importiere Kontoumsätze aus meinELBA (Raiffeisen). Buchungen werden automatisch kategorisiert —
+          in der Vorschau kannst du jede Zeile anpassen. Bereits importierte Buchungen werden erkannt und übersprungen.
+        </p>
+        <div class="button-row">
+          <button class="btn-primary" id="import-bank-btn">Bank-CSV importieren</button>
+          <input type="file" id="import-bank-input" accept=".csv,text/csv" hidden>
+        </div>
+        <div class="form-row" style="margin-top:14px">
+          <label for="own-identifiers">Eigene Konten/Namen <span class="hint" style="display:inline">(für Umbuchungs-Erkennung, kommagetrennt)</span></label>
+          <input type="text" id="own-identifiers" placeholder="z.B. Mustermann, AT12 3456 …">
+        </div>
+      </div>
+
+      <div class="settings-section">
         <h2>Automatische Sicherungen</h2>
         <p class="hint">
           Die App legt automatisch lokale Wiederherstellungspunkte auf diesem Gerät an — praktisch, um eine
@@ -455,6 +471,35 @@
         <div class="modal-footer">
           <button type="button" class="btn-secondary" data-close-modal>Abbrechen</button>
           <button type="button" class="btn-danger" id="confirm-ok">Bestätigen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== IMPORT MODAL ========== -->
+  <div class="modal-backdrop" id="import-modal" hidden>
+    <div class="modal large" role="dialog" aria-modal="true" aria-labelledby="import-modal-title">
+      <div class="modal-header">
+        <h2 id="import-modal-title">Bank-CSV importieren</h2>
+        <button class="icon-btn" data-close-modal aria-label="Schließen">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p class="import-summary" id="import-summary"></p>
+        <div class="import-table-wrap">
+          <table class="import-table">
+            <thead>
+              <tr><th>Datum</th><th>Beschreibung</th><th>Betrag</th><th>Kategorie</th><th class="imp-center">zählt&nbsp;nicht</th><th class="imp-center">merken</th></tr>
+            </thead>
+            <tbody id="import-tbody"></tbody>
+          </table>
+        </div>
+        <label class="import-clear"><input type="checkbox" id="import-clear-existing"> Vorhandene Einträge vorher löschen (Neustart mit diesem Import)</label>
+        <div class="modal-footer">
+          <div class="spacer"></div>
+          <button type="button" class="btn-secondary" data-close-modal>Abbrechen</button>
+          <button type="button" class="btn-primary" id="import-commit-btn">Importieren</button>
         </div>
       </div>
     </div>

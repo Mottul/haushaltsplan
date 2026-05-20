@@ -31,7 +31,16 @@
     { name: 'Abos & Verträge', icon: '📱', color: '#14b8a6', type: 'expense' },
     { name: 'Bildung', icon: '🎓', color: '#06b6d4', type: 'expense' },
     { name: 'Versicherungen', icon: '🛡️', color: '#64748b', type: 'expense' },
-    { name: 'Sparen & Anlage', icon: '💰', color: '#84cc16', type: 'expense' },
+    { name: 'Sparen & Anlage', icon: '💰', color: '#84cc16', type: 'expense', exclude: true },
+    { name: 'Bargeld', icon: '💵', color: '#16a34a', type: 'expense' },
+    { name: 'Bankgebühren', icon: '🏦', color: '#475569', type: 'expense' },
+    { name: 'Spenden', icon: '❤️', color: '#e11d48', type: 'expense' },
+    { name: 'Kinderbetreuung', icon: '🧸', color: '#fb923c', type: 'expense' },
+    { name: 'Alimente/Unterhalt', icon: '🤝', color: '#7c3aed', type: 'expense' },
+    { name: 'Tabak', icon: '🚬', color: '#a8a29e', type: 'expense' },
+    { name: 'Drogerie', icon: '🧴', color: '#0891b2', type: 'expense' },
+    { name: 'Haushalt & Heimwerker', icon: '🔧', color: '#ea580c', type: 'expense' },
+    { name: 'Auto', icon: '🚙', color: '#4f46e5', type: 'expense' },
     { name: 'Geschenke', icon: '🎁', color: '#a855f7', type: 'expense' },
     { name: 'Sonstiges', icon: '📦', color: '#94a3b8', type: 'expense' },
     { name: 'Gehalt', icon: '💼', color: '#10b981', type: 'income' },
@@ -39,6 +48,7 @@
     { name: 'Kapitalerträge', icon: '📈', color: '#0ea5e9', type: 'income' },
     { name: 'Erstattungen', icon: '↩️', color: '#6366f1', type: 'income' },
     { name: 'Sonstige Einnahmen', icon: '🪙', color: '#84cc16', type: 'income' },
+    { name: 'Umbuchung', icon: '🔄', color: '#94a3b8', type: 'expense', exclude: true },
   ];
 
   let state = { entries: [], categories: [], settings: { currency: 'EUR', theme: 'auto' } };
@@ -135,6 +145,20 @@
   // ---------- Category helpers ----------
   const FALLBACK_CAT = { id: null, name: 'Ohne Kategorie', icon: '❓', color: '#94a3b8', type: 'expense' };
   const getCategory = (id) => state.categories.find((c) => c.id === id) || FALLBACK_CAT;
+
+  // Eine Buchung zählt nicht in die Statistik, wenn sie explizit markiert ist
+  // oder ihre Kategorie als "exclude" gilt (Umbuchung, Sparen & Anlage).
+  const isExcluded = (entry) =>
+    entry.excludeFromStats != null ? entry.excludeFromStats : !!getCategory(entry.categoryId).exclude;
+
+  function ensureCategory(name, type) {
+    let c = state.categories.find((x) => x.name.toLowerCase() === String(name).toLowerCase());
+    if (c) return c;
+    const def = DEFAULT_CATEGORIES.find((d) => d.name.toLowerCase() === String(name).toLowerCase());
+    c = def ? { id: uid(), ...def } : { id: uid(), name, icon: '🏷️', color: '#94a3b8', type: type || 'expense' };
+    state.categories.push(c);
+    return c;
+  }
 
   // ---------- Recurrence ----------
   function addMonths(d, n, anchorDay) {
@@ -248,6 +272,7 @@
 
     let income = 0, expense = 0;
     for (const o of occ) {
+      if (isExcluded(o)) continue;
       if (o.type === 'income') income += o.amount;
       else expense += o.amount;
     }
@@ -284,7 +309,7 @@
     const occ = getOccurrences(from, to);
     const spentByCat = new Map();
     for (const o of occ) {
-      if (o.type === 'expense') spentByCat.set(o.categoryId, (spentByCat.get(o.categoryId) || 0) + o.amount);
+      if (o.type === 'expense' && !isExcluded(o)) spentByCat.set(o.categoryId, (spentByCat.get(o.categoryId) || 0) + o.amount);
     }
     const rows = budgeted
       .map((c) => {
@@ -377,7 +402,7 @@
   function aggregateByCategory(occ, type) {
     const map = new Map();
     for (const o of occ) {
-      if (o.type !== type) continue;
+      if (o.type !== type || isExcluded(o)) continue;
       const cat = getCategory(o.categoryId);
       const key = cat.id || '__none__';
       if (!map.has(key)) map.set(key, { name: cat.name, color: cat.color, icon: cat.icon, value: 0 });
@@ -447,6 +472,7 @@
     }
 
     for (const o of occ) {
+      if (isExcluded(o)) continue;
       const d = parseDate(o.date);
       const b = buckets.find((x) => x.y === d.getFullYear() && x.m === d.getMonth());
       if (!b) continue;
@@ -859,6 +885,254 @@
     });
   }
 
+  // ---------- Bank-CSV-Import (meinELBA) ----------
+  const RULES_KEY = 'haushaltsplan_rules_v1';
+
+  const IMPORT_RULES = [
+    { any: ['TRADE REPUBLIC', 'FLATEX', 'BITPANDA'], cat: 'Sparen & Anlage' },
+    { any: ['BANKOMAT', 'SB-BEHEBUNG', 'SB BEHEBUNG', 'ATM '], cat: 'Bargeld' },
+    { any: ['KONTOFÜHRUNG', 'BUCHUNGSENTGELT', 'SOLLZINSEN', 'KREDITBEARBEITUNG', 'BUCHUNGSGEBÜHR', 'KONTOGEBÜHR'], cat: 'Bankgebühren' },
+    { any: ['APOTHEKE'], cat: 'Gesundheit' },
+    { any: ['MPREIS', 'HOFER', 'BILLA', 'LIDL', 'PENNY', 'SPAR ', 'DISK ', 'MERKUR', 'UNIMARKT', 'NAH&FRISCH'], cat: 'Lebensmittel' },
+    { any: ['BAECKER', 'BÄCKER', 'BAGUETTE', 'BAECKEREI', 'BÄCKEREI', 'KONDITOREI'], cat: 'Lebensmittel' },
+    { any: ['BIPA', 'MÜLLER', 'MUELLER', 'DM FIL', 'DM-DROGERIE', 'DROGERIE'], cat: 'Drogerie' },
+    { any: ['SHELL', 'OMV', 'ARAL', 'AVANTI', 'ENI ', 'JET ', 'ELAN', 'BP ', 'TANKSTELLE', 'DIESEL'], cat: 'Auto' },
+    { any: ['GARAGE', 'PARKPLAT', 'PARKHAUS', 'PARKEN', 'PARKGARAGE'], cat: 'Auto' },
+    { any: ['VERKEHRSVERBUND', 'VVT', 'ÖBB', 'OEBB', ' IVB', 'POSTBUS', 'WIENER LINIEN'], cat: 'Transport' },
+    { any: ['SPUSU', 'MASS RESPONSE', 'MAGENTA', 'A1 TELEKOM', 'DREI ', 'YESSS', 'TIDAL', 'NETFLIX', 'SPOTIFY', 'DISNEY', 'ANTHROPIC', 'OPENAI', 'YOUTUBE', 'AMAZON PRIME', 'MICROSOFT', 'GOOGLE'], cat: 'Abos & Verträge' },
+    { any: ['ÄRZTE OHNE GRENZEN', 'ARZTE OHNE GRENZEN', 'ROTES KREUZ', 'ÖRK', 'OERK', 'VIER PFOTEN', 'CARITAS', 'GREENPEACE', 'SOS-KINDERDORF', 'WWF', 'UNICEF'], cat: 'Spenden' },
+    { any: ['SLW', 'KINDERGARTEN', 'SCHISCHULE', 'JUGENDLAND', 'KRABBELSTUBE', 'KINDERBETREUUNG', 'KINDERKRIPPE'], cat: 'Kinderbetreuung' },
+    { any: ['ALIMENTE', 'UNTERHALT', 'KRENKEL'], cat: 'Alimente/Unterhalt' },
+    { any: ['TRAFIK', 'TABAK'], cat: 'Tabak' },
+    { any: ['TAEKWONDO', 'ALPENVEREIN', 'HALLENBAD', 'GLUNGEZER', 'THERME', ' KINO', 'FITNESS', 'BERGBAHN', 'SCHWIMMBAD', 'MUSEUM', 'KLETTER'], cat: 'Freizeit' },
+    { any: ['OBI', 'BAUHAUS', 'HORNBACH', 'IKEA', 'XXXLUTZ', 'MÖBELIX', 'MOEMAX', 'LAGERHAUS'], cat: 'Haushalt & Heimwerker' },
+    { any: ['SMYTHS', 'TOYS'], cat: 'Geschenke' },
+    { any: ['EISAUTOMAT', 'EISSALON', 'TOMASELLI', 'RESTAURANT', 'CAFE', 'CAFÉ', 'MCDONALD', 'GASTHAUS', 'PIZZ', 'BURGER', 'KEBAB', 'IMBISS', 'WIRTSHAUS'], cat: 'Restaurant & Café' },
+    { any: ['KIEWEG', 'KAUTION'], cat: 'Wohnen / Miete' },
+    { any: ['VERSICHERUNG', 'UNIQA', 'GENERALI', 'ALLIANZ', 'MUKI', 'HELVETIA', 'WIENER STÄDTISCHE', 'DONAU VERS', 'GRAWE'], cat: 'Versicherungen' },
+  ];
+
+  function loadRules() {
+    try {
+      const a = JSON.parse(localStorage.getItem(RULES_KEY) || '[]');
+      return Array.isArray(a) ? a : [];
+    } catch {
+      return [];
+    }
+  }
+  function saveRules(rules) {
+    try { localStorage.setItem(RULES_KEY, JSON.stringify(rules)); } catch (e) { /* unkritisch */ }
+  }
+  function addRule(key, categoryName, amount) {
+    if (!key) return;
+    const K = key.toUpperCase();
+    const amt = amount != null ? Math.abs(amount) : null;
+    const rules = loadRules().filter((r) => !(r.key === K && r.amount === amt));
+    rules.push({ key: K, cat: categoryName, amount: amt });
+    saveRules(rules);
+  }
+
+  function ownIdentifiers() {
+    return String(state.settings.ownIdentifiers || '')
+      .split(/[,\n;]/)
+      .map((s) => s.trim().toUpperCase())
+      .filter(Boolean);
+  }
+
+  function parseAmountDe(s) {
+    return parseFloat(String(s).replace(/\./g, '').replace(',', '.'));
+  }
+  function isoFromDe(d) {
+    const m = String(d).match(/^(\d{2})\.(\d{2})\.(\d{4})/);
+    return m ? `${m[3]}-${m[2]}-${m[1]}` : '';
+  }
+
+  function splitCsvLine(line) {
+    const out = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQ) {
+        if (ch === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else inQ = false; }
+        else cur += ch;
+      } else if (ch === '"') inQ = true;
+      else if (ch === ';') { out.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    out.push(cur);
+    return out;
+  }
+
+  function parseBankCsv(text) {
+    const lines = text.split(/\r\n|\n|\r/);
+    const txs = [];
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const f = splitCsvLine(line);
+      if (f.length < 6 || !/^\d{2}\.\d{2}\.\d{4}$/.test(f[0].trim())) continue;
+      const amount = parseAmountDe(f[3]);
+      if (!isFinite(amount) || amount === 0) continue;
+      txs.push({
+        rawText: f[1],
+        amount,
+        date: isoFromDe(f[2].trim() || f[0].trim()),
+        importKey: (f[5] || '').trim() || `${f[0].trim()}|${f[3].trim()}|${f[1].slice(0, 24)}`,
+      });
+    }
+    return txs;
+  }
+
+  function extractDesc(text) {
+    for (const key of ['Zahlungsempfänger:', 'Auftraggeber:', 'Empfänger:']) {
+      const re = new RegExp(
+        key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
+          '\\s*(.*?)(?:\\s+(?:Verwendungszweck:|Zahlungsreferenz:|IBAN|BIC|Empfänger-Kennung:|Mandat:|Auftraggeberreferenz:)|$)'
+      );
+      const m = text.match(re);
+      if (m && m[1].trim()) return m[1].trim();
+    }
+    let m = text.match(/Verwendungszweck:\s*(.*?)\s+(?:[A-ZÄÖÜ.]+\s+\d{4,5}|Zahlungsreferenz:|IBAN)/);
+    if (m && m[1].trim()) return m[1].trim();
+    m = text.match(/Zahlungsreferenz:\s*([A-Za-zÄÖÜäöü][A-Za-zÄÖÜäöü0-9&.\-/ ]{2,}?)\s{2,}/);
+    if (m && m[1].trim()) return m[1].trim();
+    return text.slice(0, 40).trim();
+  }
+
+  function categorizeTx(text, amount) {
+    const t = text.toUpperCase();
+    for (const r of loadRules()) {
+      if (r.key && t.includes(r.key) && (r.amount == null || Math.abs(Math.abs(amount) - r.amount) < 0.005)) return r.cat;
+    }
+    const isIncome = amount > 0;
+    const ownHit = ownIdentifiers().some((id) => t.includes(id));
+
+    if (t.includes('ONLINE SPAREN')) return isIncome ? 'Umbuchung' : 'Sparen & Anlage';
+    if (isIncome) {
+      if (t.includes('GEHALT') || t.includes('LOHN')) return 'Gehalt';
+      if (ownHit) return 'Umbuchung';
+      return 'Erstattungen';
+    }
+    if (t.includes('KOMMUNALBETRIEBE')) return t.includes('TELEKOM') ? 'Abos & Verträge' : 'Energie & Wasser';
+    for (const rule of IMPORT_RULES) {
+      const hit = rule.all ? rule.all.every((k) => t.includes(k)) : rule.any.some((k) => t.includes(k));
+      if (hit) return rule.cat;
+    }
+    if (ownHit) return 'Umbuchung';
+    return 'Sonstiges';
+  }
+
+  let importRows = [];
+
+  function importCategoryNames() {
+    const names = new Set();
+    state.categories.forEach((c) => names.add(c.name));
+    DEFAULT_CATEGORIES.forEach((d) => names.add(d.name));
+    return [...names];
+  }
+
+  async function handleBankCsv(file) {
+    let text;
+    try {
+      const buf = await file.arrayBuffer();
+      text = new TextDecoder('utf-8').decode(buf);
+      if (text.includes('�')) text = new TextDecoder('windows-1252').decode(buf);
+      text = text.replace(/^﻿/, '');
+    } catch (e) {
+      showToast('Datei konnte nicht gelesen werden.');
+      return;
+    }
+    const txs = parseBankCsv(text);
+    if (!txs.length) {
+      showToast('Keine Buchungen erkannt — ist das eine meinELBA-CSV?');
+      return;
+    }
+    const existing = new Set(state.entries.map((e) => e.importKey).filter(Boolean));
+    importRows = txs.map((tx) => {
+      const catName = categorizeTx(tx.rawText, tx.amount);
+      const def = DEFAULT_CATEGORIES.find((d) => d.name === catName);
+      return {
+        importKey: tx.importKey,
+        date: tx.date,
+        rawText: tx.rawText,
+        desc: extractDesc(tx.rawText),
+        amount: tx.amount,
+        type: tx.amount > 0 ? 'income' : 'expense',
+        category: catName,
+        exclude: !!(def && def.exclude),
+        remember: false,
+        dup: existing.has(tx.importKey),
+      };
+    });
+    renderImportPreview();
+    openModal('import-modal');
+  }
+
+  function renderImportPreview() {
+    const newRows = importRows.filter((r) => !r.dup);
+    const dupCount = importRows.length - newRows.length;
+    el('import-summary').textContent =
+      `${newRows.length} neue Buchung${newRows.length === 1 ? '' : 'en'}` +
+      (dupCount ? ` · ${dupCount} bereits vorhanden (übersprungen)` : '');
+
+    const optionsHtml = (sel) =>
+      importCategoryNames().map((n) => `<option${n === sel ? ' selected' : ''}>${esc(n)}</option>`).join('');
+
+    el('import-tbody').innerHTML = importRows
+      .map((r, i) => {
+        const sign = r.type === 'income' ? '+' : '−';
+        const amt = `<td class="imp-amt ${r.type}">${sign}${esc(formatMoney(Math.abs(r.amount)))}</td>`;
+        if (r.dup) {
+          return `<tr class="imp-row dup"><td>${formatDateDisplay(r.date)}</td><td class="imp-desc">${esc(r.desc)}</td>${amt}<td colspan="3"><span class="imp-dup">bereits importiert</span></td></tr>`;
+        }
+        return `<tr class="imp-row" data-idx="${i}">
+          <td>${formatDateDisplay(r.date)}</td>
+          <td class="imp-desc" title="${esc(r.rawText)}">${esc(r.desc)}</td>
+          ${amt}
+          <td><select class="imp-cat" data-idx="${i}">${optionsHtml(r.category)}</select></td>
+          <td class="imp-center"><input type="checkbox" class="imp-excl" data-idx="${i}"${r.exclude ? ' checked' : ''}></td>
+          <td class="imp-center"><input type="checkbox" class="imp-rem" data-idx="${i}"></td>
+        </tr>`;
+      })
+      .join('');
+    el('import-commit-btn').disabled = newRows.length === 0;
+  }
+
+  function commitImport() {
+    const toImport = importRows.filter((r) => !r.dup);
+    if (!toImport.length) { closeModal('import-modal'); return; }
+    takeSnapshot('Vor Import', true);
+    if (el('import-clear-existing').checked) state.entries = [];
+    let added = 0;
+    for (const r of toImport) {
+      const cat = ensureCategory(r.category, r.type);
+      if (r.remember && r.desc) {
+        if (/PAYPAL/i.test(r.rawText)) addRule('PAYPAL', r.category, Math.abs(r.amount));
+        else addRule(r.desc, r.category, null);
+      }
+      state.entries.push({
+        id: uid(),
+        type: r.type,
+        amount: Math.round(Math.abs(r.amount) * 100) / 100,
+        description: r.desc || 'Buchung',
+        categoryId: cat.id,
+        date: r.date,
+        recurrence: 'none',
+        recurrenceEnd: null,
+        note: r.rawText,
+        excludeFromStats: r.exclude,
+        importKey: r.importKey,
+        source: 'import',
+        createdAt: Date.now(),
+      });
+      added++;
+    }
+    markChanged();
+    save();
+    closeModal('import-modal');
+    refreshAll();
+    showToast(`${added} Buchungen importiert`);
+  }
+
   // ---------- Import / Export ----------
   async function shareOrDownload(filename, content, mime, label) {
     if (navigator.canShare) {
@@ -970,6 +1244,7 @@
     el('theme-select').value = state.settings.theme;
     el('currency-select').value = state.settings.currency;
     el('currency-suffix').textContent = currencySymbol();
+    el('own-identifiers').value = state.settings.ownIdentifiers || '';
   }
 
   // ---------- Navigation ----------
@@ -1305,6 +1580,33 @@
     el('import-json-input').addEventListener('change', (e) => {
       if (e.target.files[0]) importJSON(e.target.files[0]);
       e.target.value = '';
+    });
+
+    el('import-bank-btn').addEventListener('click', () => el('import-bank-input').click());
+    el('import-bank-input').addEventListener('change', (e) => {
+      if (e.target.files[0]) handleBankCsv(e.target.files[0]);
+      e.target.value = '';
+    });
+    el('import-commit-btn').addEventListener('click', commitImport);
+    el('import-tbody').addEventListener('change', (e) => {
+      const t = e.target;
+      const i = Number(t.getAttribute('data-idx'));
+      if (isNaN(i) || !importRows[i]) return;
+      if (t.classList.contains('imp-cat')) {
+        importRows[i].category = t.value;
+        const def = DEFAULT_CATEGORIES.find((d) => d.name === t.value);
+        importRows[i].exclude = !!(def && def.exclude);
+        const cb = el('import-tbody').querySelector(`.imp-excl[data-idx="${i}"]`);
+        if (cb) cb.checked = importRows[i].exclude;
+      } else if (t.classList.contains('imp-excl')) {
+        importRows[i].exclude = t.checked;
+      } else if (t.classList.contains('imp-rem')) {
+        importRows[i].remember = t.checked;
+      }
+    });
+    el('own-identifiers').addEventListener('input', (e) => {
+      state.settings.ownIdentifiers = e.target.value;
+      save();
     });
 
     el('reset-data-btn').addEventListener('click', () => {

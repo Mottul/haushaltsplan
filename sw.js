@@ -1,4 +1,4 @@
-const CACHE = 'haushaltsplan-v7';
+const CACHE = 'haushaltsplan-v8';
 const ASSETS = [
   './',
   './index.html',
